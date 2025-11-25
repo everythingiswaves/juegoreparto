@@ -3,8 +3,9 @@
   Permite a los alumnos arrastrar círculos a rectángulos (grupos)
   y verifica si el reparto ha sido equitativo.
 
-  EDICIÓN: Se ha implementado responsividad para pantallas pequeñas (tabletas)
-  en modo horizontal, ajustando el tamaño del canvas y los elementos.
+  EDICIÓN: Se ha mejorado la responsividad para que se adapte mejor
+  a pantallas verticales (como laptops en modo retrato o monitores grandes),
+  permitiendo que el canvas utilice más altura.
   
   CORRECCIÓN DE ERROR: Se ha arreglado el error de sintaxis en la definición
   del objeto círculo dentro de la función resetGame.
@@ -186,12 +187,15 @@
 
         function setup() {
             // 1. Detección de tamaño de ventana para hacerlo responsivo
-            // Usamos un 95% del ancho de la ventana y ajustamos la altura proporcionalmente.
             let containerWidth = document.getElementById('p5-canvas-container').offsetWidth;
             canvasWidth = containerWidth;
-            // Mantenemos una relación de aspecto para que se vea bien en horizontal (aprox 1.6:1)
-            canvasHeight = min(windowHeight * 0.7, containerWidth * 0.65);
-            canvasHeight = max(canvasHeight, 350); // Mínimo para que quepan elementos
+            
+            // Lógica de Responsividad Vertical Mejorada:
+            // Usa hasta el 80% de la altura de la ventana, pero limita la altura a 100% del ancho
+            // para evitar lienzos excesivamente altos en pantallas muy estrechas.
+            let maxH = min(windowHeight * 0.8, containerWidth * 1.0); 
+            canvasHeight = max(maxH, 350); // Mínimo de 350px
+            
 
             // Crea el lienzo de p5.js
             let canvas = createCanvas(canvasWidth, canvasHeight);
@@ -209,8 +213,11 @@
             // Recalcula el tamaño del canvas basado en el contenedor
             let containerWidth = document.getElementById('p5-canvas-container').offsetWidth;
             canvasWidth = containerWidth;
-            canvasHeight = min(windowHeight * 0.7, containerWidth * 0.65);
-            canvasHeight = max(canvasHeight, 350);
+            
+            // Lógica de Responsividad Vertical Mejorada (copia de setup):
+            let maxH = min(windowHeight * 0.8, containerWidth * 1.0);
+            canvasHeight = max(maxH, 350);
+            
             resizeCanvas(canvasWidth, canvasHeight);
             
             // Reajusta todos los elementos a la nueva escala y posición
@@ -252,7 +259,7 @@
             
             // 2. Crear los rectángulos (Targets) en la parte superior
             // Altura y ancho basados en las nuevas dimensiones del canvas
-            let targetHeight = canvasHeight * 0.3; // 30% de la altura
+            let targetHeight = canvasHeight * 0.3; // 30% de la altura (se adapta a la nueva altura del canvas)
             let targetY = padding;
             let targetWidth = (canvasWidth - padding * (numTargets + 1)) / numTargets;
 
@@ -295,7 +302,6 @@
                     x: x,
                     y: y,
                     originalX: x,
-                    // CORRECCIÓN: Se elimina el ':' duplicado que causaba el SyntaxError.
                     originalY: y, 
                     size: circleSize,
                     inTarget: -1, 
