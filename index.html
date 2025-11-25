@@ -1,0 +1,461 @@
+<!--
+  Juego interactivo de Reparto Equitativo para segundo grado (p5.js).
+  Permite a los alumnos arrastrar círculos a rectángulos (grupos)
+  y verifica si el reparto ha sido equitativo.
+
+  EDICIÓN: Se ha implementado un sistema de grilla (Grid Positioning)
+  dentro de cada rectángulo para ordenar los círculos al ser soltados.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reparto Equitativo con Círculos</title>
+    <!-- Carga de la librería p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        /* Estilos usando Tailwind CSS (cargado via CDN) para la interfaz */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f4f8; /* Fondo suave */
+            font-family: 'Inter', sans-serif;
+            flex-direction: column;
+        }
+        #p5-canvas-container {
+            border: 4px solid #3b82f6; /* Borde azul llamativo */
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        .instructions {
+            background-color: #ffffff;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            max-width: 800px;
+            margin-bottom: 10px;
+        }
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            box-shadow: 0 4px #1d4ed8;
+            font-size: 1rem;
+        }
+        .btn-check {
+            background-color: #4ade80; /* Verde brillante */
+            color: #166534;
+        }
+        .btn-check:hover {
+            background-color: #10b981;
+            box-shadow: 0 2px #065f46;
+            transform: translateY(2px);
+        }
+        .btn-reset {
+            background-color: #facc15; /* Amarillo */
+            color: #713f12;
+        }
+        .btn-reset:hover {
+            background-color: #f59e0b;
+            box-shadow: 0 2px #b45309;
+            transform: translateY(2px);
+        }
+        #message {
+            margin-top: 15px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .message-success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .message-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="instructions">
+        <h2>🎮 ¡A Repartir Círculos!</h2>
+        <p id="problem-text">
+            El objetivo es **repartir** todos los círculos de abajo en los rectángulos de arriba,
+            asegurando que **cada rectángulo quede con la misma cantidad** de círculos.
+        </p>
+    </div>
+
+    <div id="p5-canvas-container"></div>
+
+    <div id="message"></div>
+
+    <div class="controls">
+        <button class="btn btn-check" onclick="checkReparto()">¡Comprobar!</button>
+        <button class="btn btn-reset" onclick="resetGame()">Nuevo Reto</button>
+    </div>
+
+    <script>
+        // --- Variables Globales del Juego ---
+        let circles = []; // Array de círculos (objetos a repartir)
+        let targets = []; // Array de rectángulos (grupos receptores)
+        let numCircles;
+        let numTargets;
+        let circleSize = 30;
+        let padding = 20;
+        let canvasWidth = 800;
+        let canvasHeight = 550;
+        let isDragging = false;
+        let draggedCircle = null;
+        let messageDiv;
+        
+        // Parámetros de la grilla dentro de los rectángulos (Targets)
+        const gridSpacing = 35; // Espacio entre centros de círculos
+        const circlesPerRowCount = 2; // Máximo de círculos por fila dentro del target
+
+        // --- Funciones de Utilidad ---
+
+        /**
+         * Calcula las coordenadas X, Y para centrar un círculo en una grilla de un Target.
+         * @param {Object} target - El objeto rectángulo (target).
+         * @param {number} index - El índice (0-based) del círculo dentro de ese target.
+         * @returns {Object} {x, y} - Las coordenadas centrales para el círculo.
+         */
+        function calculateGridPosition(target, index) {
+            // Posición relativa a 0,0 del target
+            let col = index % circlesPerRowCount;
+            let row = floor(index / circlesPerRowCount);
+            
+            // Margen inicial para centrar la pequeña grilla
+            let startX = target.x + (target.w / 2) - ((circlesPerRowCount - 1) * gridSpacing / 2);
+            let startY = target.y + (target.h / 2) - (gridSpacing / 2); // Centrado verticalmente
+            
+            // Coordenadas absolutas
+            return {
+                x: startX + col * gridSpacing,
+                y: startY + row * gridSpacing
+            };
+        }
+
+
+        // --- Configuración Inicial ---
+
+        function setup() {
+            // Crea el lienzo de p5.js
+            let canvas = createCanvas(canvasWidth, canvasHeight);
+            canvas.parent('p5-canvas-container'); // Adjunta el canvas al div contenedor
+            messageDiv = document.getElementById('message');
+            resetGame();
+        }
+
+        /**
+         * Inicializa o reinicia el juego generando nuevos números y objetos.
+         */
+        function resetGame() {
+            // 1. Generar números aleatorios para círculos y rectángulos
+            // Queremos que numCircles sea divisible por numTargets.
+            // numTargets (grupos) entre 2 y 5
+            numTargets = floor(random(2, 6));
+
+            // numCircles (objetos) debe ser un múltiplo de numTargets y estar entre 8 y 20
+            let multiples = [];
+            for (let i = 2; i <= 4; i++) { // Cocientes posibles: 2, 3, 4
+                let value = numTargets * i;
+                if (value >= 8 && value <= 20) {
+                    multiples.push(value);
+                }
+            }
+            if (multiples.length > 0) {
+                numCircles = random(multiples);
+            } else {
+                // Fallback si no se puede generar un número adecuado, forzar uno
+                numTargets = 3;
+                numCircles = 12;
+            }
+
+            // Limpiar arrays
+            circles = [];
+            targets = [];
+            messageDiv.textContent = "";
+            messageDiv.className = "message";
+            
+            // 2. Crear los rectángulos (Targets) en la parte superior
+            let targetHeight = 150; // Aumentamos la altura para acomodar la grilla
+            let targetY = padding;
+            let targetWidth = (canvasWidth - padding * (numTargets + 1)) / numTargets;
+
+            for (let i = 0; i < numTargets; i++) {
+                let x = padding + i * (targetWidth + padding);
+                targets.push({
+                    x: x,
+                    y: targetY,
+                    w: targetWidth,
+                    h: targetHeight,
+                    count: 0, // Contador de círculos en este rectángulo
+                    id: i,
+                    circlesInTarget: [], // NUEVO: Almacena referencias a los círculos dentro, por orden de llegada
+                });
+            }
+
+            // 3. Crear los círculos (Objects) en la parte inferior
+            // Se colocarán en una cuadrícula en la parte inferior del canvas.
+            let startY = canvasHeight - 100; // Fila inicial
+            let maxCols = floor(canvasWidth / (circleSize + padding));
+            let col = 0;
+            let row = 0;
+
+            for (let i = 0; i < numCircles; i++) {
+                let x = padding + circleSize / 2 + col * (circleSize + padding);
+                let y = startY + row * (circleSize + padding);
+                
+                // Si la columna excede el límite, pasa a la siguiente fila
+                if (col >= maxCols) {
+                    col = 0;
+                    row++;
+                    x = padding + circleSize / 2 + col * (circleSize + padding);
+                    y = startY + row * (circleSize + padding);
+                }
+
+                circles.push({
+                    x: x,
+                    y: y,
+                    originalX: x,
+                    originalY: y,
+                    size: circleSize,
+                    inTarget: -1, // -1 si no está en ningún rectángulo, o el ID del rectángulo
+                    isDragging: false,
+                    // Propiedades para reposicionamiento dentro del target
+                    targetIndex: -1, // Posición (índice 0, 1, 2...) dentro del array circlesInTarget del target
+                });
+                col++;
+            }
+
+            // 4. Actualizar el mensaje del problema
+            let expectedCount = numCircles / numTargets;
+            document.getElementById('problem-text').innerHTML = `
+                El objetivo es **repartir** los **${numCircles} círculos** de abajo
+                en los **${numTargets} rectángulos** de arriba.
+                <br>
+                ¿Cuántos círculos debe tener cada rectángulo para que el reparto sea equitativo?
+            `;
+        }
+
+        /**
+         * Bucle de dibujo de p5.js
+         */
+        function draw() {
+            background(230, 235, 240); // Fondo del canvas
+
+            // 1. Dibujar rectángulos (Targets/Grupos)
+            targets.forEach(t => {
+                // Dibujar el contenedor
+                noFill();
+                stroke(59, 130, 246); // Azul
+                strokeWeight(4);
+                rect(t.x, t.y, t.w, t.h, 10); // 10 es el radio del borde redondeado
+
+                // Mostrar el conteo
+                fill(59, 130, 246);
+                noStroke();
+                textSize(18);
+                textAlign(CENTER, TOP);
+                text(`Grupo ${t.id + 1}:`, t.x + t.w / 2, t.y + 10); // Título en la parte superior del target
+                text(`${t.count} círculos`, t.x + t.w / 2, t.y + t.h - 30); // Conteo en la parte inferior
+            });
+
+            // 2. Dibujar círculos (Objetos)
+            circles.forEach(c => {
+                // Color del círculo
+                if (c.inTarget !== -1) {
+                    // Círculo dentro de un rectángulo
+                    fill(252, 165, 165); // Rosa claro
+                    stroke(239, 68, 68); // Rojo
+                } else if (c.isDragging) {
+                    // Círculo arrastrándose
+                    fill(255, 255, 100); // Amarillo brillante
+                    stroke(255, 165, 0); // Naranja
+                } else {
+                    // Círculo en posición inicial
+                    fill(150, 200, 250); // Azul claro
+                    stroke(59, 130, 246); // Azul
+                }
+                
+                strokeWeight(2);
+                
+                // Si se está arrastrando, dibuja en la posición del mouse
+                if (c.isDragging) {
+                     ellipse(mouseX, mouseY, c.size);
+                } else {
+                    // Si está quieto, dibuja en su posición fija (original o en la grilla del target)
+                    ellipse(c.x, c.y, c.size);
+                }
+            });
+
+            // Asegurar que el círculo arrastrado se dibuje al final (encima de todo)
+            // No es necesario ya que el arrastre se maneja dibujando en la posición del mouse
+            // dentro del bucle de circles.
+        }
+
+        // --- Manejo de Interacción (Arrastre) ---
+
+        function mousePressed() {
+            // Revisa si se está presionando sobre algún círculo
+            for (let i = circles.length - 1; i >= 0; i--) {
+                let c = circles[i];
+                // Ignorar el círculo si ya está siendo arrastrado (aunque no debería pasar)
+                if (c.isDragging) continue;
+
+                let d = dist(mouseX, mouseY, c.x, c.y);
+
+                if (d < c.size / 2) {
+                    // Reinicia el estado del grupo de conteo antes de arrastrar
+                    if (c.inTarget !== -1) {
+                        let currentTarget = targets[c.inTarget];
+                        
+                        // Quitar de la lista de círculos del target
+                        currentTarget.circlesInTarget.splice(c.targetIndex, 1);
+                        currentTarget.count--;
+
+                        // Actualizar los índices de los círculos restantes en ese target
+                        currentTarget.circlesInTarget.forEach((cc, idx) => {
+                            cc.targetIndex = idx;
+                            let newPos = calculateGridPosition(currentTarget, idx);
+                            cc.x = newPos.x;
+                            cc.y = newPos.y;
+                        });
+
+                        c.inTarget = -1; // Lo marca como fuera de grupo
+                        c.targetIndex = -1;
+                    }
+                    
+                    draggedCircle = c;
+                    draggedCircle.isDragging = true;
+                    isDragging = true;
+                    
+                    // Mueve el círculo arrastrado al final del array para que se dibuje encima
+                    circles.splice(i, 1);
+                    circles.push(draggedCircle);
+                    break;
+                }
+            }
+        }
+
+        function mouseDragged() {
+            if (draggedCircle) {
+                // Actualiza la posición interna del objeto mientras se arrastra
+                draggedCircle.x = mouseX;
+                draggedCircle.y = mouseY;
+            }
+        }
+
+        function mouseReleased() {
+            if (draggedCircle) {
+                let foundTarget = false;
+
+                // 1. Revisar si el círculo cayó en algún rectángulo (target)
+                targets.forEach(t => {
+                    if (mouseX > t.x && mouseX < t.x + t.w &&
+                        mouseY > t.y && mouseY < t.y + t.h) {
+                        
+                        // Círculo soltado en un rectángulo: Asignar al grupo
+                        
+                        // NUEVO: Calcular la posición en la grilla
+                        let newIndex = t.circlesInTarget.length;
+                        let newPos = calculateGridPosition(t, newIndex);
+                        
+                        draggedCircle.x = newPos.x;
+                        draggedCircle.y = newPos.y;
+                        
+                        draggedCircle.inTarget = t.id;
+                        draggedCircle.targetIndex = newIndex; // Guardar su índice de posición
+                        
+                        t.count++;
+                        t.circlesInTarget.push(draggedCircle); // Añadir a la lista del target
+                        foundTarget = true;
+                    }
+                });
+
+                if (!foundTarget) {
+                    // 2. Si no cayó en un rectángulo: devolver a su posición original
+                    draggedCircle.x = draggedCircle.originalX;
+                    draggedCircle.y = draggedCircle.originalY;
+                    draggedCircle.inTarget = -1;
+                    draggedCircle.targetIndex = -1;
+                }
+                
+                draggedCircle.isDragging = false;
+                draggedCircle = null;
+                isDragging = false;
+                
+                // Limpiar mensaje si hay alguno
+                messageDiv.textContent = "";
+                messageDiv.className = "message";
+            }
+        }
+
+        /**
+         * Verifica si todos los círculos han sido repartidos equitativamente.
+         */
+        function checkReparto() {
+            // El reparto equitativo es el número de círculos dividido por el número de rectángulos
+            let expectedCount = numCircles / numTargets;
+            let allCirclesPlaced = true;
+            let isEquitable = true;
+
+            // 1. Verificar que todos los círculos estén colocados
+            circles.forEach(c => {
+                if (c.inTarget === -1) {
+                    allCirclesPlaced = false;
+                }
+            });
+
+            if (!allCirclesPlaced) {
+                showMessage("¡Ups! Aún quedan círculos sin repartir. ¡No te olvides de ninguno!", "error");
+                return;
+            }
+
+            // 2. Verificar que el conteo en cada grupo sea el esperado
+            targets.forEach(t => {
+                if (t.count !== expectedCount) {
+                    isEquitable = false;
+                }
+            });
+
+            if (isEquitable) {
+                showMessage(`¡Excelente trabajo! Has repartido ${numCircles} círculos entre ${numTargets} grupos, dándole ${expectedCount} a cada uno.`, "success");
+            } else {
+                showMessage(`Casi lo logras. Los ${numCircles} círculos no están repartidos equitativamente entre los ${numTargets} grupos. ¡Inténtalo de nuevo!`, "error");
+            }
+        }
+        
+        /**
+         * Muestra mensajes de estado y feedback al usuario.
+         * @param {string} text - Mensaje a mostrar.
+         * @param {string} type - 'success' o 'error'.
+         */
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message message-${type}`;
+        }
+    </script>
+</body>
+</html>
