@@ -3,12 +3,9 @@
   Permite a los alumnos arrastrar círculos a rectángulos (grupos)
   y verifica si el reparto ha sido equitativo.
 
-  EDICIÓN: Se ha mejorado la responsividad para que se adapte mejor
-  a pantallas verticales (como laptops en modo retrato o monitores grandes),
-  permitiendo que el canvas utilice más altura.
-  
-  CORRECCIÓN DE ERROR: Se ha arreglado el error de sintaxis en la definición
-  del objeto círculo dentro de la función resetGame.
+  EDICIÓN: Se movieron los botones de control (Comprobar y Nuevo Reto) a la parte
+  superior, justo debajo de las instrucciones, para asegurar que siempre sean
+  visibles y accesibles en configuraciones de pantalla vertical.
 -->
 <!DOCTYPE html>
 <html lang="es">
@@ -31,7 +28,7 @@
             background-color: #f0f4f8; /* Fondo suave */
             font-family: 'Inter', sans-serif;
             flex-direction: column;
-            overflow: hidden; /* Evitar barras de desplazamiento accidentales */
+            /* Se elimina 'overflow: hidden' para permitir el scroll si es necesario */
             padding: 5px; /* Pequeño padding general */
         }
         
@@ -71,6 +68,7 @@
             gap: 0.75rem; /* Menos espacio entre botones */
             justify-content: center;
             margin-top: 5px;
+            margin-bottom: 10px; /* Separación después de los botones */
         }
         .btn {
             padding: 0.6rem 1.2rem; /* Botones más pequeños */
@@ -101,7 +99,8 @@
             transform: translateY(2px);
         }
         #message {
-            margin-top: 10px;
+            margin-top: 0;
+            margin-bottom: 10px;
             padding: 8px 15px;
             border-radius: 8px;
             font-weight: bold;
@@ -132,14 +131,16 @@
         </p>
     </div>
 
-    <div id="p5-canvas-container"></div>
-
-    <div id="message"></div>
-
+    <!-- CONTROLES MOVIDOS A LA PARTE SUPERIOR -->
     <div class="controls">
         <button class="btn btn-check" onclick="checkReparto()">¡Comprobar!</button>
         <button class="btn btn-reset" onclick="resetGame()">Nuevo Reto</button>
     </div>
+
+    <div id="message"></div>
+    
+    <!-- El Canvas va al final para que el área de juego principal esté debajo de los controles -->
+    <div id="p5-canvas-container"></div>
 
     <script>
         // --- Variables Globales del Juego ---
